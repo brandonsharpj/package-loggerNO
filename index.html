@@ -8,28 +8,11 @@
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
-    --navy: #0f1f38;
-    --navy-mid: #162a4a;
-    --accent: #4fc3f7;
-    --accent-dim: #1e6a8a;
-    --green: #69f0ae;
-    --red: #ff5252;
-    --yellow: #ffd740;
-    --text: #e8f0fe;
-    --text-dim: #7a9bb5;
-    --border: rgba(79,195,247,0.15);
-    --radius: 10px;
+    --navy: #0f1f38; --navy-mid: #162a4a; --accent: #4fc3f7; --accent-dim: #1e6a8a;
+    --green: #69f0ae; --red: #ff5252; --yellow: #ffd740; --text: #e8f0fe;
+    --text-dim: #7a9bb5; --border: rgba(79,195,247,0.15); --radius: 10px;
   }
-  body {
-    font-family: 'DM Sans', sans-serif;
-    background: var(--navy);
-    color: var(--text);
-    min-height: 100vh;
-    padding: 24px 16px;
-    background-image:
-      radial-gradient(ellipse at 20% 20%, rgba(79,195,247,0.05) 0%, transparent 50%),
-      radial-gradient(ellipse at 80% 80%, rgba(105,240,174,0.03) 0%, transparent 50%);
-  }
+  body { font-family: 'DM Sans', sans-serif; background: var(--navy); color: var(--text); min-height: 100vh; padding: 24px 16px; background-image: radial-gradient(ellipse at 20% 20%, rgba(79,195,247,0.05) 0%, transparent 50%), radial-gradient(ellipse at 80% 80%, rgba(105,240,174,0.03) 0%, transparent 50%); }
   .container { max-width: 560px; margin: 0 auto; }
   header { margin-bottom: 28px; }
   header h1 { font-family: 'DM Mono', monospace; font-size: 22px; font-weight: 500; color: var(--accent); letter-spacing: -0.02em; }
@@ -37,12 +20,7 @@
   .card { background: var(--navy-mid); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
   .card-title { font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 14px; }
   .photo-btns { display: flex; gap: 10px; margin-bottom: 12px; }
-  .photo-btn {
-    flex: 1; background: var(--navy); border: 1.5px dashed var(--accent-dim);
-    border-radius: var(--radius); padding: 18px 10px; text-align: center;
-    cursor: pointer; transition: all 0.2s; color: var(--text);
-    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
-  }
+  .photo-btn { flex: 1; background: var(--navy); border: 1.5px dashed var(--accent-dim); border-radius: var(--radius); padding: 18px 10px; text-align: center; cursor: pointer; transition: all 0.2s; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; }
   .photo-btn:hover { border-color: var(--accent); background: rgba(79,195,247,0.07); }
   .photo-btn .icon { font-size: 22px; display: block; margin-bottom: 6px; }
   .photo-btn small { display: block; font-size: 11px; color: var(--text-dim); margin-top: 3px; }
@@ -131,9 +109,6 @@
 <script>
 const POWER_AUTOMATE_URL = "https://default88155c28f750401391d38347ddb3da.a7.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/8fd4285573aa4175837145df693edd47/triggers/manual/paths/invoke?api-version=1";
 
-// Use a CORS proxy to allow the Anthropic API call from the browser
-const PROXY_URL = "https://corsproxy.io/?url=https://api.anthropic.com/v1/messages";
-
 let imageB64 = null;
 let imageMimeType = 'image/jpeg';
 let entries = [];
@@ -143,16 +118,28 @@ document.getElementById('f-date').value = new Date().toISOString().split('T')[0]
 function handleFile(file) {
   if (!file) return;
   imageMimeType = file.type || 'image/jpeg';
-  const reader = new FileReader();
-  reader.onload = ev => {
-    const preview = document.getElementById('preview');
-    preview.src = ev.target.result;
-    preview.style.display = 'block';
-    imageB64 = ev.target.result.split(',')[1];
+  // Resize image before sending to keep payload small
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  img.onload = () => {
+    const canvas = document.createElement('canvas');
+    const MAX = 1024;
+    let w = img.width, h = img.height;
+    if (w > MAX || h > MAX) {
+      if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+      else { w = Math.round(w * MAX / h); h = MAX; }
+    }
+    canvas.width = w; canvas.height = h;
+    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+    imageB64 = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+    imageMimeType = 'image/jpeg';
+    document.getElementById('preview').src = canvas.toDataURL('image/jpeg', 0.85);
+    document.getElementById('preview').style.display = 'block';
     document.getElementById('scanBtn').disabled = false;
+    URL.revokeObjectURL(url);
     showStatus('Image loaded — click Scan Image to extract details', 'info');
   };
-  reader.readAsDataURL(file);
+  img.src = url;
 }
 
 document.getElementById('cameraInput').addEventListener('change', e => handleFile(e.target.files[0]));
@@ -174,7 +161,7 @@ async function scanImage() {
   showStatus('Analyzing label with AI...', 'info');
 
   try {
-    const resp = await fetch(PROXY_URL, {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -183,13 +170,18 @@ async function scanImage() {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
+        max_tokens: 500,
         messages: [{ role: 'user', content: [
           { type: 'image', source: { type: 'base64', media_type: imageMimeType, data: imageB64 } },
           { type: 'text', text: 'Extract shipping label info from this image. Return ONLY valid JSON with exactly these keys: {"tracking": "", "from": "", "to": ""}. Use empty string if not found. tracking = tracking/barcode number. from = sender name or company. to = recipient name. No markdown, no backticks, just raw JSON.' }
         ]}]
       })
     });
+
+    if (!resp.ok) {
+      const err = await resp.json();
+      throw new Error(err.error?.message || 'API error');
+    }
 
     const data = await resp.json();
     const text = data.content?.filter(b => b.type === 'text').map(b => b.text).join('') || '';
@@ -202,7 +194,8 @@ async function scanImage() {
     const filled = [parsed.tracking, parsed.from, parsed.to].filter(Boolean).length;
     showStatus(filled > 0 ? `✓ Extracted ${filled} field${filled !== 1 ? 's' : ''} — review and submit` : 'No text detected — fill in fields manually', filled > 0 ? 'success' : 'error');
   } catch(err) {
-    showStatus('Scan failed — please fill in fields manually', 'error');
+    console.error('Scan error:', err);
+    showStatus('Scan failed: ' + (err.message || 'Unknown error') + ' — fill in fields manually', 'error');
   }
 
   btn.disabled = false;
