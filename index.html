@@ -19,13 +19,13 @@
   header p { font-size: 13px; color: var(--text-dim); margin-top: 4px; }
   .card { background: var(--navy-mid); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
   .card-title { font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 14px; }
-  .photo-btns { display: flex; gap: 10px; margin-bottom: 12px; }
+  .photo-btns { display: flex; gap: 10px; }
   .photo-btn { flex: 1; background: var(--navy); border: 1.5px dashed var(--accent-dim); border-radius: var(--radius); padding: 18px 10px; text-align: center; cursor: pointer; transition: all 0.2s; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; }
   .photo-btn:hover { border-color: var(--accent); background: rgba(79,195,247,0.07); }
   .photo-btn .icon { font-size: 22px; display: block; margin-bottom: 6px; }
   .photo-btn small { display: block; font-size: 11px; color: var(--text-dim); margin-top: 3px; }
   #cameraInput, #galleryInput { display: none; }
-  #preview { display: none; width: 100%; max-height: 200px; object-fit: contain; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 12px; }
+  #preview { display: none; width: 100%; max-height: 180px; object-fit: contain; border-radius: 8px; border: 1px solid var(--border); margin-top: 12px; }
   .field { margin-bottom: 14px; }
   .field label { display: block; font-family: 'DM Mono', monospace; font-size: 10px; font-weight: 500; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 6px; }
   .field input { width: 100%; background: var(--navy); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-family: 'DM Mono', monospace; font-size: 13px; color: var(--text); transition: border-color 0.2s; outline: none; }
@@ -35,8 +35,6 @@
   button { font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; border-radius: 8px; padding: 10px 18px; cursor: pointer; border: none; transition: all 0.15s; }
   button:active { transform: scale(0.97); }
   button:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
-  .btn-scan { background: var(--accent); color: var(--navy); flex: 1; }
-  .btn-scan:hover:not(:disabled) { background: #81d4fa; }
   .btn-submit { background: var(--green); color: var(--navy); flex: 1; }
   .btn-submit:hover:not(:disabled) { background: #b9f6ca; }
   .btn-clear { background: transparent; color: var(--text-dim); border: 1px solid var(--border); padding: 10px 14px; }
@@ -63,12 +61,11 @@
 <div class="container">
   <header>
     <h1>📦 Package Logger</h1>
-    <p>Scan a label — data goes straight to SharePoint</p>
+    <p>Log packages straight to SharePoint</p>
   </header>
 
   <div class="card">
-    <div class="card-title">1 — Photo</div>
-    <img id="preview">
+    <div class="card-title">1 — Photo (optional reference)</div>
     <div class="photo-btns">
       <button class="photo-btn" onclick="document.getElementById('cameraInput').click()">
         <span class="icon">📷</span>Take Photo<small>Use camera</small>
@@ -79,20 +76,18 @@
     </div>
     <input type="file" id="cameraInput" accept="image/*" capture="environment">
     <input type="file" id="galleryInput" accept="image/*">
+    <img id="preview">
   </div>
 
   <div class="card">
-    <div class="card-title">2 — Details</div>
+    <div class="card-title">2 — Enter Details</div>
     <div class="field"><label>Date Received</label><input type="date" id="f-date"></div>
-    <div class="field"><label>To (Recipient)</label><input type="text" id="f-to" placeholder="Auto-filled from scan"></div>
-    <div class="field"><label>From (Sender)</label><input type="text" id="f-from" placeholder="Auto-filled from scan"></div>
-    <div class="field"><label>Tracking Number</label><input type="text" id="f-tracking" placeholder="Auto-filled from scan"></div>
+    <div class="field"><label>To (Recipient)</label><input type="text" id="f-to" placeholder="Who is it addressed to?"></div>
+    <div class="field"><label>From (Sender)</label><input type="text" id="f-from" placeholder="Who sent it?"></div>
+    <div class="field"><label>Tracking Number</label><input type="text" id="f-tracking" placeholder="Tracking or barcode number"></div>
     <div class="btn-row">
-      <button class="btn-scan" id="scanBtn" onclick="scanImage()" disabled>Scan Image</button>
-      <button class="btn-clear" onclick="clearAll()">Clear</button>
-    </div>
-    <div class="btn-row" style="margin-top:10px">
       <button class="btn-submit" id="submitBtn" onclick="submitEntry()">Submit to SharePoint</button>
+      <button class="btn-clear" onclick="clearAll()">Clear</button>
     </div>
     <div class="status" id="statusMsg"></div>
   </div>
@@ -108,38 +103,19 @@
 
 <script>
 const POWER_AUTOMATE_URL = "https://default88155c28f750401391d38347ddb3da.a7.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/8fd4285573aa4175837145df693edd47/triggers/manual/paths/invoke?api-version=1";
-const GEMINI_API_KEY = "AIzaSyCnj_Jsvq0Y-NjyGaV6I4CjIlVMC1nDo_Q";
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
 
-let imageB64 = null;
-let imageMimeType = 'image/jpeg';
 let entries = [];
-
 document.getElementById('f-date').value = new Date().toISOString().split('T')[0];
 
 function handleFile(file) {
   if (!file) return;
-  const img = new Image();
-  const url = URL.createObjectURL(file);
-  img.onload = () => {
-    const canvas = document.createElement('canvas');
-    const MAX = 1024;
-    let w = img.width, h = img.height;
-    if (w > MAX || h > MAX) {
-      if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
-      else { w = Math.round(w * MAX / h); h = MAX; }
-    }
-    canvas.width = w; canvas.height = h;
-    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-    imageB64 = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
-    imageMimeType = 'image/jpeg';
-    document.getElementById('preview').src = canvas.toDataURL('image/jpeg', 0.85);
-    document.getElementById('preview').style.display = 'block';
-    document.getElementById('scanBtn').disabled = false;
-    URL.revokeObjectURL(url);
-    showStatus('Image loaded — click Scan Image to extract details', 'info');
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const preview = document.getElementById('preview');
+    preview.src = ev.target.result;
+    preview.style.display = 'block';
   };
-  img.src = url;
+  reader.readAsDataURL(file);
 }
 
 document.getElementById('cameraInput').addEventListener('change', e => handleFile(e.target.files[0]));
@@ -153,58 +129,13 @@ function showStatus(msg, type) {
 }
 function hideStatus() { document.getElementById('statusMsg').style.display = 'none'; }
 
-async function scanImage() {
-  if (!imageB64) return;
-  const btn = document.getElementById('scanBtn');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span>Scanning...';
-  showStatus('Analyzing label with AI...', 'info');
-
-  try {
-    const resp = await fetch(GEMINI_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { inline_data: { mime_type: imageMimeType, data: imageB64 } },
-            { text: 'Extract shipping label info from this image. Return ONLY valid JSON with exactly these keys: {"tracking": "", "from": "", "to": ""}. Use empty string if not found. tracking = tracking/barcode number. from = sender name or company. to = recipient name. No markdown, no backticks, just raw JSON.' }
-          ]
-        }]
-      })
-    });
-
-    if (!resp.ok) {
-      const err = await resp.json();
-      throw new Error(err.error?.message || 'API error');
-    }
-
-    const data = await resp.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
-
-    if (parsed.tracking) document.getElementById('f-tracking').value = parsed.tracking;
-    if (parsed.from) document.getElementById('f-from').value = parsed.from;
-    if (parsed.to) document.getElementById('f-to').value = parsed.to;
-
-    const filled = [parsed.tracking, parsed.from, parsed.to].filter(Boolean).length;
-    showStatus(filled > 0 ? `✓ Extracted ${filled} field${filled !== 1 ? 's' : ''} — review and submit` : 'No text detected — fill in fields manually', filled > 0 ? 'success' : 'error');
-  } catch(err) {
-    console.error('Scan error:', err);
-    showStatus('Scan failed: ' + (err.message || 'Unknown error') + ' — fill in fields manually', 'error');
-  }
-
-  btn.disabled = false;
-  btn.innerHTML = 'Scan Image';
-}
-
 async function submitEntry() {
   const date = document.getElementById('f-date').value;
   const to = document.getElementById('f-to').value.trim();
   const from = document.getElementById('f-from').value.trim();
   const tracking = document.getElementById('f-tracking').value.trim();
 
-  if (!date && !to && !from && !tracking) { showStatus('Please fill in at least one field', 'error'); return; }
+  if (!to && !from && !tracking) { showStatus('Please fill in at least one field', 'error'); return; }
 
   const btn = document.getElementById('submitBtn');
   btn.disabled = true;
@@ -254,8 +185,6 @@ function clearFields() {
   document.getElementById('preview').style.display = 'none';
   document.getElementById('cameraInput').value = '';
   document.getElementById('galleryInput').value = '';
-  imageB64 = null;
-  document.getElementById('scanBtn').disabled = true;
 }
 function clearAll() { clearFields(); hideStatus(); }
 </script>
