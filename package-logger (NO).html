@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Package Logger</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --navy: #0f1f38;
+    --navy-mid: #162a4a;
+    --navy-light: #1e3a5f;
+    --accent: #4fc3f7;
+    --accent-dim: #1e6a8a;
+    --green: #69f0ae;
+    --red: #ff5252;
+    --yellow: #ffd740;
+    --text: #e8f0fe;
+    --text-dim: #7a9bb5;
+    --border: rgba(79,195,247,0.15);
+    --radius: 10px;
+  }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--navy);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px 16px;
+    background-image:
+      radial-gradient(ellipse at 20% 20%, rgba(79,195,247,0.05) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 80%, rgba(105,240,174,0.03) 0%, transparent 50%);
+  }
+  .container { max-width: 560px; margin: 0 auto; }
+  header { margin-bottom: 28px; }
+  header h1 { font-family: 'DM Mono', monospace; font-size: 22px; font-weight: 500; color: var(--accent); letter-spacing: -0.02em; }
+  header p { font-size: 13px; color: var(--text-dim); margin-top: 4px; }
+  .card { background: var(--navy-mid); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
+  .card-title { font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 14px; }
+
+  /* Two button approach for photo */
+  .photo-btns { display: flex; gap: 10px; margin-bottom: 12px; }
+  .photo-btn {
+    flex: 1;
+    background: var(--navy);
+    border: 1.5px dashed var(--accent-dim);
+    border-radius: var(--radius);
+    padding: 18px 10px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .photo-btn:hover { border-color: var(--accent); background: rgba(79,195,247,0.07); }
+  .photo-btn .icon { font-size: 22px; display: block; margin-bottom: 6px; }
+  .photo-btn small { display: block; font-size: 11px; color: var(--text-dim); margin-top: 3px; }
+
+  /* Hidden file inputs */
+  #cameraInput { display: none; }
+  #galleryInput { display: none; }
+
+  #preview { display: none; width: 100%; max-height: 200px; object-fit: contain; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 12px; }
+
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-family: 'DM Mono', monospace; font-size: 10px; font-weight: 500; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 6px; }
+  .field input { width: 100%; background: var(--navy); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-family: 'DM Mono', monospace; font-size: 13px; color: var(--text); transition: border-color 0.2s; outline: none; }
+  .field input:focus { border-color: var(--accent); }
+  .field input::placeholder { color: var(--text-dim); }
+
+  .btn-row { display: flex; gap: 10px; margin-top: 4px; }
+  button { font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; border-radius: 8px; padding: 10px 18px; cursor: pointer; border: none; transition: all 0.15s; }
+  button:active { transform: scale(0.97); }
+  button:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+  .btn-scan { background: var(--accent); color: var(--navy); flex: 1; }
+  .btn-scan:hover:not(:disabled) { background: #81d4fa; }
+  .btn-submit { background: var(--green); color: var(--navy); flex: 1; }
+  .btn-submit:hover:not(:disabled) { background: #b9f6ca; }
+  .btn-clear { background: transparent; color: var(--text-dim); border: 1px solid var(--border); padding: 10px 14px; }
+  .btn-clear:hover { color: var(--text); border-color: var(--text-dim); }
+
+  .status { display: none; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-top: 12px; font-weight: 500; }
+  .status.info { background: rgba(79,195,247,0.1); color: var(--accent); border: 1px solid rgba(79,195,247,0.2); }
+  .status.success { background: rgba(105,240,174,0.1); color: var(--green); border: 1px solid rgba(105,240,174,0.2); }
+  .status.error { background: rgba(255,82,82,0.1); color: var(--red); border: 1px solid rgba(255,82,82,0.2); }
+
+  .log-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .log-count { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text-dim); background: var(--navy); border: 1px solid var(--border); border-radius: 99px; padding: 2px 10px; }
+  .log-empty { text-align: center; padding: 24px; color: var(--text-dim); font-size: 13px; }
+  .log-item { background: var(--navy); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-bottom: 8px; display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: start; animation: fadeIn 0.2s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+  .log-tracking { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--accent); font-weight: 500; grid-column: 1; }
+  .log-meta { font-size: 12px; color: var(--text-dim); grid-column: 1; }
+  .log-date { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--yellow); grid-column: 2; grid-row: 1; white-space: nowrap; }
+  .log-status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); grid-column: 2; grid-row: 2; justify-self: end; margin-top: 4px; }
+  .log-status-dot.error { background: var(--red); }
+  .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid rgba(15,31,56,0.3); border-top-color: var(--navy); border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>📦 Package Logger</h1>
+    <p>Scan a label — data goes straight to SharePoint</p>
+  </header>
+
+  <div class="card">
+    <div class="card-title">1 — Photo</div>
+
+    <img id="preview">
+
+    <div class="photo-btns">
+      <button class="photo-btn" onclick="document.getElementById('cameraInput').click()">
+        <span class="icon">📷</span>
+        Take Photo
+        <small>Use camera</small>
+      </button>
+      <button class="photo-btn" onclick="document.getElementById('galleryInput').click()">
+        <span class="icon">🖼️</span>
+        Upload Image
+        <small>From gallery</small>
+      </button>
+    </div>
+
+    <!-- Separate inputs: one forces camera, one opens gallery -->
+    <input type="file" id="cameraInput" accept="image/*" capture="environment">
+    <input type="file" id="galleryInput" accept="image/*">
+  </div>
+
+  <div class="card">
+    <div class="card-title">2 — Details</div>
+    <div class="field"><label>Date Received</label><input type="date" id="f-date"></div>
+    <div class="field"><label>To (Recipient)</label><input type="text" id="f-to" placeholder="Auto-filled from scan"></div>
+    <div class="field"><label>From (Sender)</label><input type="text" id="f-from" placeholder="Auto-filled from scan"></div>
+    <div class="field"><label>Tracking Number</label><input type="text" id="f-tracking" placeholder="Auto-filled from scan"></div>
+
+    <div class="btn-row">
+      <button class="btn-scan" id="scanBtn" onclick="scanImage()" disabled>Scan Image</button>
+      <button class="btn-clear" onclick="clearAll()">Clear</button>
+    </div>
+    <div class="btn-row" style="margin-top:10px">
+      <button class="btn-submit" id="submitBtn" onclick="submitEntry()">Submit to SharePoint</button>
+    </div>
+    <div class="status" id="statusMsg"></div>
+  </div>
+
+  <div class="card">
+    <div class="log-header">
+      <div class="card-title" style="margin:0">Session Log</div>
+      <span class="log-count" id="logCount">0 logged</span>
+    </div>
+    <div id="logList"><div class="log-empty">No packages logged this session</div></div>
+  </div>
+</div>
+
+<script>
+const POWER_AUTOMATE_URL = "https://default88155c28f750401391d38347ddb3da.a7.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/8fd4285573aa4175837145df693edd47/triggers/manual/paths/invoke?api-version=1";
+
+let imageB64 = null;
+let entries = [];
+
+document.getElementById('f-date').value = new Date().toISOString().split('T')[0];
+
+function handleFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const preview = document.getElementById('preview');
+    preview.src = ev.target.result;
+    preview.style.display = 'block';
+    imageB64 = ev.target.result.split(',')[1];
+    document.getElementById('scanBtn').disabled = false;
+    showStatus('Image loaded — click Scan Image to extract details', 'info');
+  };
+  reader.readAsDataURL(file);
+}
+
+document.getElementById('cameraInput').addEventListener('change', e => handleFile(e.target.files[0]));
+document.getElementById('galleryInput').addEventListener('change', e => handleFile(e.target.files[0]));
+
+function showStatus(msg, type) {
+  const el = document.getElementById('statusMsg');
+  el.innerHTML = msg;
+  el.className = 'status ' + type;
+  el.style.display = 'block';
+}
+function hideStatus() { document.getElementById('statusMsg').style.display = 'none'; }
+
+async function scanImage() {
+  if (!imageB64) return;
+  const btn = document.getElementById('scanBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Scanning...';
+  showStatus('Analyzing label with AI...', 'info');
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: [
+          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: imageB64 } },
+          { type: 'text', text: 'Extract shipping label info from this image. Return ONLY valid JSON with exactly these keys: {"tracking": "", "from": "", "to": ""}. Use empty string if not found. tracking = tracking/barcode number. from = sender name or company. to = recipient name. No markdown, no backticks, just raw JSON.' }
+        ]}]
+      })
+    });
+    const data = await resp.json();
+    const text = data.content?.filter(b => b.type === 'text').map(b => b.text).join('') || '';
+    const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
+    if (parsed.tracking) document.getElementById('f-tracking').value = parsed.tracking;
+    if (parsed.from) document.getElementById('f-from').value = parsed.from;
+    if (parsed.to) document.getElementById('f-to').value = parsed.to;
+    const filled = [parsed.tracking, parsed.from, parsed.to].filter(Boolean).length;
+    showStatus(filled > 0 ? `✓ Extracted ${filled} field${filled !== 1 ? 's' : ''} — review and submit` : 'No text detected — fill in fields manually', filled > 0 ? 'success' : 'error');
+  } catch(err) {
+    showStatus('Scan failed — fill in fields manually', 'error');
+  }
+  btn.disabled = false;
+  btn.innerHTML = 'Scan Image';
+}
+
+async function submitEntry() {
+  const date = document.getElementById('f-date').value;
+  const to = document.getElementById('f-to').value.trim();
+  const from = document.getElementById('f-from').value.trim();
+  const tracking = document.getElementById('f-tracking').value.trim();
+  if (!date && !to && !from && !tracking) { showStatus('Please fill in at least one field', 'error'); return; }
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Sending to SharePoint...';
+  showStatus('Submitting to SharePoint...', 'info');
+  try {
+    await fetch(POWER_AUTOMATE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date, to, from, tracking }),
+      mode: 'no-cors'
+    });
+    entries.unshift({ date, to, from, tracking, status: 'sent' });
+    renderLog();
+    showStatus('✓ Logged to SharePoint successfully!', 'success');
+    clearFields();
+    setTimeout(hideStatus, 3000);
+  } catch(err) {
+    showStatus('Failed to reach SharePoint — check your connection', 'error');
+    entries.unshift({ date, to, from, tracking, status: 'error' });
+    renderLog();
+  }
+  btn.disabled = false;
+  btn.innerHTML = 'Submit to SharePoint';
+}
+
+function renderLog() {
+  const list = document.getElementById('logList');
+  document.getElementById('logCount').textContent = entries.length + ' logged';
+  if (!entries.length) { list.innerHTML = '<div class="log-empty">No packages logged this session</div>'; return; }
+  list.innerHTML = entries.map(e => `
+    <div class="log-item">
+      <div class="log-tracking">${e.tracking || 'No tracking #'}</div>
+      <div class="log-date">${e.date || ''}</div>
+      <div class="log-meta">${e.to ? 'To: ' + e.to : ''}${e.to && e.from ? ' · ' : ''}${e.from ? 'From: ' + e.from : ''}</div>
+      <div class="log-status-dot ${e.status === 'error' ? 'error' : ''}"></div>
+    </div>`).join('');
+}
+
+function clearFields() {
+  document.getElementById('f-to').value = '';
+  document.getElementById('f-from').value = '';
+  document.getElementById('f-tracking').value = '';
+  document.getElementById('f-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('preview').style.display = 'none';
+  document.getElementById('cameraInput').value = '';
+  document.getElementById('galleryInput').value = '';
+  imageB64 = null;
+  document.getElementById('scanBtn').disabled = true;
+}
+function clearAll() { clearFields(); hideStatus(); }
+</script>
+</body>
+</html>
